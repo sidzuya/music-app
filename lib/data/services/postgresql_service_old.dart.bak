@@ -1,0 +1,236 @@
+import 'dart:async';
+import 'package:flutter/foundation.dart';
+import '../models/user_model.dart';
+import '../models/song_model.dart';
+import '../models/playlist_model.dart';
+import '../../core/config/database_config.dart';
+
+// Условный импорт для веб-платформы
+import 'postgresql_service_stub.dart'
+  if (dart.library.io) 'postgresql_service_io.dart' as postgres_impl;
+
+class PostgreSQLService {
+  static final PostgreSQLService _instance = PostgreSQLService._internal();
+  factory PostgreSQLService() => _instance;
+  PostgreSQLService._internal();
+
+  late final postgres_impl.PostgreSQLServiceImpl _impl;
+
+  PostgreSQLService._internal() : _impl = postgres_impl.PostgreSQLServiceImpl();
+
+  // Тестирование подключения
+  Future<bool> testConnection({
+    required String host,
+    required int port,
+    required String database,
+    required String username,
+    required String password,
+    bool useSSL = false,
+  }) async {
+    if (kIsWeb) {
+      // В веб-версии PostgreSQL не поддерживается
+      return false;
+    }
+    return await _impl.testConnection(
+      host: localhost,
+      port: 5432,
+      database: database,
+      username: username,
+      password: password,
+      useSSL: useSSL,
+    );
+  }
+
+  // Создание таблиц
+  Future<void> createTables() async {
+    return await _impl.createTables();
+  }
+
+  // Операции с пользователями
+  Future<int> insertUser(UserModel user) async {
+    return await _impl.insertUser(user);
+  }
+
+  Future<UserModel?> getUserByEmail(String email) async {
+    return await _impl.getUserByEmail(email);
+  }
+
+  Future<UserModel?> getUserById(int id) async {
+    return await _impl.getUserById(id);
+  }
+
+  // Операции с песнями
+  Future<List<SongModel>> getAllSongs() async {
+    return await _impl.getAllSongs();
+  }
+
+  Future<List<SongModel>> searchSongs(String query) async {
+    return await _impl.searchSongs(query);
+  }
+
+  // Операции с плейлистами
+  Future<int> insertPlaylist(PlaylistModel playlist) async {
+    final connection = await _getConnection();
+    
+    final result = await connection.execute(
+      Sql.named('''
+        INSERT INTO playlists (name, description, cover_image, user_id, created_at, updated_at)
+        VALUES (@name, @description, @cover_image, @user_id, @created_at, @updated_at)
+        RETURNING id
+      '''),
+      parameters: {
+        'name': playlist.name,
+        'description': playlist.description,
+        'cover_image': playlist.coverImage,
+        'user_id': playlist.userId,
+        'created_at': playlist.createdAt,
+        'updated_at': playlist.updatedAt,
+      },
+    );
+    
+    return result.first.first as int;
+  }
+
+  Future<List<PlaylistModel>> getUserPlaylists(int userId) async {
+    final connection = await _getConnection();
+    
+    final result = await connection.execute(
+      Sql.named('SELECT * FROM playlists WHERE user_id = @user_id ORDER BY created_at DESC'),
+      parameters: {'user_id': userId},
+    );
+    
+    return result.map((row) => PlaylistModel(
+      id: row[0] as int,
+      name: row[1] as String,
+      description: row[2] as String?,
+      coverImage: row[3] as String?,
+      userId: row[4] as int,
+      createdAt: row[5] as DateTime,
+      updatedAt: row[6] as DateTime,
+    )).toList();
+  }
+
+  Future<void> addSongToPlaylist(int playlistId, int songId) async {
+    final connection = await _getConnection();
+    
+    // Получаем максимальную позицию
+    final positionResult = await connection.execute(
+      Sql.named('SELECT COALESCE(MAX(position), -1) + 1 FROM playlist_songs WHERE playlist_id = @playlist_id'),
+      parameters: {'playlist_id': playlistId},
+    );
+    
+    final position = positionResult.first.first as int;
+    
+    await connection.execute(
+      Sql.named('''
+        INSERT INTO playlist_songs (playlist_id, song_id, position, added_at)
+        VALUES (@playlist_id, @song_id, @position, CURRENT_TIMESTAMP)
+        ON CONFLICT (playlist_id, song_id) DO NOTHING
+      '''),
+      parameters: {
+        'playlist_id': playlistId,
+        'song_id': songId,
+        'position': position,
+      },
+    );
+  }
+
+  Future<List<SongModel>> getPlaylistSongs(int playlistId) async {
+    final connection = await _getConnection();
+    
+    final result = await connection.execute(
+      Sql.named('''
+        SELECT s.* FROM songs s
+        INNER JOIN playlist_songs ps ON s.id = ps.song_id
+        WHERE ps.playlist_id = @playlist_id
+        ORDER BY ps.position
+      '''),
+      parameters: {'playlist_id': playlistId},
+    );
+    
+    return result.map((row) => SongModel(
+      id: row[0] as int,
+      title: row[1] as String,
+      artist: row[2] as String,
+      album: row[3] as String,
+      albumArt: row[4] as String?,
+      audioUrl: row[5] as String?,
+      duration: Duration(seconds: row[6] as int),
+      genre: row[7] as String,
+      createdAt: row[8] as DateTime,
+      isFavorite: row[9] as bool? ?? false,
+    )).toList();
+  }
+
+  // Операции с избранными
+  Future<void> toggleFavorite(int userId, int songId) async {
+    final connection = await _getConnection();
+    
+    // Проверяем, есть ли уже в избранном
+    final existsResult = await connection.execute(
+      Sql.named('SELECT id FROM favorites WHERE user_id = @user_id AND song_id = @song_id'),
+      parameters: {'user_id': userId, 'song_id': songId},
+    );
+    
+    if (existsResult.isNotEmpty) {
+      // Удаляем из избранного
+      await connection.execute(
+        Sql.named('DELETE FROM favorites WHERE user_id = @user_id AND song_id = @song_id'),
+        parameters: {'user_id': userId, 'song_id': songId},
+      );
+    } else {
+      // Добавляем в избранное
+      await connection.execute(
+        Sql.named('''
+          INSERT INTO favorites (user_id, song_id, added_at)
+          VALUES (@user_id, @song_id, CURRENT_TIMESTAMP)
+        '''),
+        parameters: {'user_id': userId, 'song_id': songId},
+      );
+    }
+  }
+
+  Future<List<SongModel>> getFavoriteSongs(int userId) async {
+    final connection = await _getConnection();
+    
+    final result = await connection.execute(
+      Sql.named('''
+        SELECT s.* FROM songs s
+        INNER JOIN favorites f ON s.id = f.song_id
+        WHERE f.user_id = @user_id
+        ORDER BY f.added_at DESC
+      '''),
+      parameters: {'user_id': userId},
+    );
+    
+    return result.map((row) => SongModel(
+      id: row[0] as int,
+      title: row[1] as String,
+      artist: row[2] as String,
+      album: row[3] as String,
+      albumArt: row[4] as String?,
+      audioUrl: row[5] as String?,
+      duration: Duration(seconds: row[6] as int),
+      genre: row[7] as String,
+      createdAt: row[8] as DateTime,
+      isFavorite: true,
+    )).toList();
+  }
+
+  Future<bool> isFavorite(int userId, int songId) async {
+    final connection = await _getConnection();
+    
+    final result = await connection.execute(
+      Sql.named('SELECT id FROM favorites WHERE user_id = @user_id AND song_id = @song_id'),
+      parameters: {'user_id': userId, 'song_id': songId},
+    );
+    
+    return result.isNotEmpty;
+  }
+
+  // Закрытие соединения
+  Future<void> close() async {
+    await _connection?.close();
+    _connection = null;
+  }
+}

@@ -1,0 +1,405 @@
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../../../core/theme/app_theme.dart';
+import '../../providers/auth_provider.dart';
+import '../../providers/locale_provider.dart';
+
+class AccountSettingsScreen extends StatefulWidget {
+  const AccountSettingsScreen({super.key});
+  @override
+  State<AccountSettingsScreen> createState() => _AccountSettingsScreenState();
+}
+
+class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
+  final _emailController = TextEditingController();
+  final _usernameController = TextEditingController();
+  final _currentPasswordController = TextEditingController();
+  final _newPasswordController = TextEditingController();
+  bool _isEditing = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadUserData();
+  }
+
+  void _loadUserData() {
+    final user = Provider.of<AuthProvider>(context, listen: false).currentUser;
+    if (user != null) {
+      _emailController.text = user.email;
+      _usernameController.text = user.username;
+    }
+  }
+
+  @override
+  void dispose() {
+    _emailController.dispose();
+    _usernameController.dispose();
+    _currentPasswordController.dispose();
+    _newPasswordController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Consumer<LocaleProvider>(
+      builder: (context, localeProvider, child) {
+        return Scaffold(
+          backgroundColor: AppTheme.darkBackground,
+          appBar: AppBar(
+            title: Text(localeProvider.getString('account')),
+            backgroundColor: AppTheme.darkBackground,
+        actions: [
+          TextButton(
+            onPressed: () {
+              setState(() {
+                _isEditing = !_isEditing;
+              });
+              if (!_isEditing) {
+                _saveChanges();
+              }
+            },
+            child: Text(
+              _isEditing ? localeProvider.getString('save') : localeProvider.getString('edit'),
+              style: const TextStyle(color: AppTheme.primaryGreen),
+            ),
+          ),
+        ],
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Profile Section
+            _buildSectionHeader(localeProvider.getString('profile')),
+            const SizedBox(height: 16),
+            
+            _buildTextField(
+              controller: _emailController,
+              label: localeProvider.getString('email'),
+              enabled: _isEditing,
+              keyboardType: TextInputType.emailAddress,
+            ),
+            const SizedBox(height: 16),
+            
+            _buildTextField(
+              controller: _usernameController,
+              label: localeProvider.getString('username'),
+              enabled: _isEditing,
+            ),
+            const SizedBox(height: 32),
+
+            // Security Section
+            _buildSectionHeader(localeProvider.getString('security')),
+            const SizedBox(height: 16),
+            
+            if (_isEditing) ...[
+              _buildTextField(
+                controller: _currentPasswordController,
+                label: localeProvider.getString('current_password'),
+                enabled: true,
+                obscureText: true,
+              ),
+              const SizedBox(height: 16),
+              
+              _buildTextField(
+                controller: _newPasswordController,
+                label: localeProvider.getString('new_password'),
+                enabled: true,
+                obscureText: true,
+              ),
+              const SizedBox(height: 16),
+            ],
+
+            _buildSettingsItem(
+              localeProvider.getString('two_factor_auth'),
+              localeProvider.getString('two_factor_auth_desc'),
+              Icons.security,
+              () => _showComingSoon(localeProvider),
+            ),
+            
+            _buildSettingsItem(
+              localeProvider.getString('active_sessions'),
+              localeProvider.getString('active_sessions_desc'),
+              Icons.devices,
+              () => _showActiveSessions(localeProvider),
+            ),
+            
+            _buildSettingsItem(
+              localeProvider.getString('login_history'),
+              localeProvider.getString('login_history_desc'),
+              Icons.history,
+              () => _showComingSoon(localeProvider),
+            ),
+            
+            const SizedBox(height: 32),
+
+            // Privacy Section
+            _buildSectionHeader(localeProvider.getString('privacy')),
+            const SizedBox(height: 16),
+            
+            _buildSettingsItem(
+              localeProvider.getString('profile_privacy'),
+              localeProvider.getString('profile_privacy_desc'),
+              Icons.visibility,
+              () => _showPrivacySettings(localeProvider),
+            ),
+            
+            _buildSettingsItem(
+              localeProvider.getString('ad_data'),
+              localeProvider.getString('ad_data_desc'),
+              Icons.ads_click,
+              () => _showComingSoon(localeProvider),
+            ),
+            
+            const SizedBox(height: 32),
+
+            // Danger Zone
+            _buildSectionHeader(localeProvider.getString('danger_zone'), color: AppTheme.errorColor),
+            const SizedBox(height: 16),
+            
+            _buildDangerItem(
+              localeProvider.getString('delete_account'),
+              localeProvider.getString('delete_account_desc'),
+              Icons.delete_forever,
+              () => _showDeleteAccountDialog(localeProvider),
+            ),
+          ],
+        ),
+      ),
+        );
+      },
+    );
+  }
+
+  Widget _buildSectionHeader(String title, {Color? color}) {
+    return Text(
+      title,
+      style: TextStyle(
+        color: color ?? AppTheme.textPrimary,
+        fontSize: 20,
+        fontWeight: FontWeight.bold,
+      ),
+    );
+  }
+
+  Widget _buildTextField({
+    required TextEditingController controller,
+    required String label,
+    required bool enabled,
+    TextInputType? keyboardType,
+    bool obscureText = false,
+  }) {
+    return TextFormField(
+      controller: controller,
+      enabled: enabled,
+      keyboardType: keyboardType,
+      obscureText: obscureText,
+      style: TextStyle(
+        color: enabled ? AppTheme.textPrimary : AppTheme.textSecondary,
+      ),
+      decoration: InputDecoration(
+        labelText: label,
+        labelStyle: TextStyle(
+          color: enabled ? AppTheme.textSecondary : AppTheme.textTertiary,
+        ),
+        filled: true,
+        fillColor: enabled ? AppTheme.surfaceColor : AppTheme.cardBackground,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: BorderSide.none,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSettingsItem(String title, String subtitle, IconData icon, VoidCallback onTap) {
+    return ListTile(
+      leading: Icon(icon, color: AppTheme.textSecondary),
+      title: Text(
+        title,
+        style: const TextStyle(
+          color: AppTheme.textPrimary,
+          fontWeight: FontWeight.w500,
+        ),
+      ),
+      subtitle: Text(
+        subtitle,
+        style: const TextStyle(
+          color: AppTheme.textSecondary,
+          fontSize: 12,
+        ),
+      ),
+      trailing: isCurrent
+          ? TextButton(
+              onPressed: () {},
+              child: Text(
+                localeProvider.getString('cancel'),
+                style: const TextStyle(color: AppTheme.textSecondary),
+              ),
+            )
+          : TextButton(
+              onPressed: () {},
+              child: Text(
+                localeProvider.getString('terminate'),
+                style: const TextStyle(color: AppTheme.errorColor),
+              ),
+            ),
+      onTap: onTap,
+    );
+  }
+
+{{ ... }}
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              localeProvider.getString('active_sessions'),
+              style: const TextStyle(
+                color: AppTheme.textPrimary,
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 20),
+            _buildSessionItem('Chrome на macOS', 'Текущая сессия', true),
+{{ ... }}
+      subtitle: Text(
+        lastActive,
+        style: const TextStyle(color: AppTheme.textSecondary),
+      ),
+      trailing: isCurrent
+            ? TextButton(
+                onPressed: () {},
+                child: Text(
+                  localeProvider.getString('cancel'),
+                  style: const TextStyle(color: AppTheme.textSecondary),
+                ),
+              )
+            : TextButton(
+                onPressed: () {},
+                child: Text(
+                  localeProvider.getString('terminate'),
+                  style: const TextStyle(color: AppTheme.errorColor),
+                ),
+              ),
+            ),
+    );
+  }
+
+  void _showPrivacySettings(LocaleProvider localeProvider) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => const PrivacySettingsScreen(),
+      ),
+    );
+  }
+
+  void _showDeleteAccountDialog(LocaleProvider localeProvider) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: AppTheme.cardBackground,
+        title: Text(
+          localeProvider.getString('delete_account'),
+          style: const TextStyle(color: AppTheme.errorColor),
+        ),
+        content: Text(
+          localeProvider.getString('delete_account_confirmation'),
+          style: const TextStyle(color: AppTheme.textSecondary),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text(localeProvider.getString('cancel'), style: const TextStyle(color: AppTheme.textSecondary)),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              // Здесь будет логика удаления аккаунта
+            },
+            child: Text(localeProvider.getString('delete'), style: const TextStyle(color: AppTheme.errorColor)),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class PrivacySettingsScreen extends StatefulWidget {
+  const PrivacySettingsScreen({super.key});
+
+  @override
+  State<PrivacySettingsScreen> createState() => _PrivacySettingsScreenState();
+}
+
+class _PrivacySettingsScreenState extends State<PrivacySettingsScreen> {
+  bool _profileVisible = true;
+  bool _playlistsVisible = true;
+  bool _followersVisible = true;
+  bool _listeningActivity = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return Consumer<LocaleProvider>(
+      builder: (context, localeProvider, child) {
+        return Scaffold(
+          backgroundColor: AppTheme.darkBackground,
+          appBar: AppBar(
+            title: Text(localeProvider.getString('privacy')),
+            backgroundColor: AppTheme.darkBackground,
+          ),
+          body: ListView(
+            padding: const EdgeInsets.all(16),
+            children: [
+              _buildSwitchTile(
+                localeProvider.getString('public_profile'),
+                localeProvider.getString('public_profile_desc'),
+                _profileVisible,
+                (value) => setState(() => _profileVisible = value),
+              ),
+              _buildSwitchTile(
+                localeProvider.getString('public_playlists'),
+                localeProvider.getString('public_playlists_desc'),
+                _playlistsVisible,
+                (value) => setState(() => _playlistsVisible = value),
+              ),
+              _buildSwitchTile(
+                localeProvider.getString('show_followers'),
+                localeProvider.getString('show_followers_desc'),
+                _followersVisible,
+                (value) => setState(() => _followersVisible = value),
+              ),
+              _buildSwitchTile(
+                localeProvider.getString('listening_activity'),
+                localeProvider.getString('listening_activity_desc'),
+                _listeningActivity,
+                (value) => setState(() => _listeningActivity = value),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildSwitchTile(String title, String subtitle, bool value, ValueChanged<bool> onChanged) {
+    return SwitchListTile(
+      title: Text(
+        title,
+        style: const TextStyle(color: AppTheme.textPrimary),
+      ),
+      subtitle: Text(
+        subtitle,
+        style: const TextStyle(color: AppTheme.textSecondary),
+      ),
+      value: value,
+      onChanged: onChanged,
+      activeColor: AppTheme.primaryGreen,
+    );
+  }
+}
