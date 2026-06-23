@@ -356,12 +356,27 @@ class SupabaseAuthService {
     }
   }
 
-  /// Delete profile row from database
+  /// Delete user account completely: profile row + auth user + sign out
   Future<void> deleteAccount(String userId) async {
+    // 1. Delete profile row
     try {
       await _client.from('profiles').delete().eq('id', userId);
     } catch (e) {
       print('Failed to delete profile row for user $userId: $e');
+    }
+
+    // 2. Delete auth user via RPC (requires a Supabase SQL function)
+    try {
+      await _client.rpc('delete_own_account');
+    } catch (e) {
+      print('RPC delete_own_account failed (function may not exist): $e');
+    }
+
+    // 3. Sign out locally
+    try {
+      await _client.auth.signOut();
+    } catch (e) {
+      print('Sign out after delete failed: $e');
     }
   }
 

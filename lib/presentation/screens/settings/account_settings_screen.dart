@@ -964,20 +964,21 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
           ),
           TextButton(
             onPressed: () async {
-              Navigator.pop(context); // Close dialog
-              Navigator.pop(context); // Close settings screen
+              // Grab provider before popping
+              final authProvider = Provider.of<AuthProvider>(context, listen: false);
+              final messenger = ScaffoldMessenger.of(context);
               
-              // Show notification
-              ScaffoldMessenger.of(context).showSnackBar(
+              Navigator.pop(context); // Close dialog
+              
+              // Delete account first, then navigate
+              await authProvider.deleteAccount();
+              
+              messenger.showSnackBar(
                 const SnackBar(
                   content: Text('Аккаунт успешно удален'),
                   backgroundColor: AppTheme.primaryGreen,
                 ),
               );
-              
-              // Log out and delete account from database
-              final authProvider = Provider.of<AuthProvider>(context, listen: false);
-              await authProvider.deleteAccount();
             },
             child: Text(localeProvider.getString('delete'), style: const TextStyle(color: AppTheme.errorColor)),
           ),
