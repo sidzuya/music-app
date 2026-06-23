@@ -20,7 +20,7 @@ class AppConstants {
     'GOOGLE_AI_API_KEY',
     defaultValue: String.fromEnvironment(
       'GEMINI_API_KEY',
-      defaultValue: 'AIzaSyAsR3rTfhSiifpJpM0MYWdw2uPULvCflZU',
+      defaultValue: 'AQ.Ab8RN6LZ1XQkMl75vmR1C5NZ6YBKLCRbrIEiME89u9qrquQSDw',
     ),
   );
   static const String googleAiPlaylistModel = String.fromEnvironment(
