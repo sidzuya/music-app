@@ -1,4 +1,3 @@
-import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../data/models/user_model.dart';
@@ -177,8 +176,8 @@ class AuthProvider with ChangeNotifier {
     required String username,
     String? bio,
     List<Map<String, dynamic>>? socialLinks,
-    File? profileImageFile,
-    File? bannerImageFile,
+    dynamic profileImageFile,
+    dynamic bannerImageFile,
   }) async {
     _isLoading = true;
     notifyListeners();

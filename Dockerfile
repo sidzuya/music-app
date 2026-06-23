@@ -1,5 +1,5 @@
 # Stage 1: Build Flutter web assets
-FROM ghcr.io/cirruslabs/flutter:stable AS builder
+FROM ghcr.io/cirruslabs/flutter:3.44.2 AS builder
 WORKDIR /app
 
 # Copy dependency files and install

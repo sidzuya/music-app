@@ -1,4 +1,5 @@
-import 'dart:io';
+import 'dart:io' if (dart.library.html) 'dart:io';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
@@ -18,8 +19,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   late TextEditingController _emailController;
   late TextEditingController _bioController;
   final List<Map<String, String>> _socialLinks = [];
-  File? _selectedProfileImage;
-  File? _selectedBannerImage;
+  XFile? _selectedProfileImage;
+  XFile? _selectedBannerImage;
   final ImagePicker _picker = ImagePicker();
   bool _isLoading = false;
 
@@ -135,7 +136,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
     ImageProvider? imageProvider;
     if (_selectedProfileImage != null) {
-      imageProvider = FileImage(_selectedProfileImage!);
+      imageProvider = kIsWeb
+          ? NetworkImage(_selectedProfileImage!.path)
+          : FileImage(File(_selectedProfileImage!.path));
     } else if (profileImage != null && profileImage.isNotEmpty) {
       imageProvider = NetworkImage(profileImage);
     }
@@ -195,7 +198,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
     ImageProvider? imageProvider;
     if (_selectedBannerImage != null) {
-      imageProvider = FileImage(_selectedBannerImage!);
+      imageProvider = kIsWeb
+          ? NetworkImage(_selectedBannerImage!.path)
+          : FileImage(File(_selectedBannerImage!.path));
     } else if (bannerImage != null && bannerImage.isNotEmpty) {
       imageProvider = NetworkImage(bannerImage);
     }
@@ -455,9 +460,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       if (pickedFile != null) {
         setState(() {
           if (imageType == ImageType.profile) {
-            _selectedProfileImage = File(pickedFile.path);
+            _selectedProfileImage = pickedFile;
           } else {
-            _selectedBannerImage = File(pickedFile.path);
+            _selectedBannerImage = pickedFile;
           }
         });
       }
@@ -513,12 +518,18 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       }
 
       // Update profile in Supabase
+      final profileFile = _selectedProfileImage != null && !kIsWeb
+          ? File(_selectedProfileImage!.path)
+          : null;
+      final bannerFile = _selectedBannerImage != null && !kIsWeb
+          ? File(_selectedBannerImage!.path)
+          : null;
       await authProvider.updateProfile(
         username: username,
         bio: bio,
         socialLinks: updatedSocialLinks,
-        profileImageFile: _selectedProfileImage,
-        bannerImageFile: _selectedBannerImage,
+        profileImageFile: profileFile,
+        bannerImageFile: bannerFile,
       );
 
       if (!mounted) return;

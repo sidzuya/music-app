@@ -1,4 +1,5 @@
-import 'dart:io';
+import 'dart:io' if (dart.library.html) 'dart:io';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../core/theme/app_theme.dart';
@@ -371,15 +372,25 @@ class _LibraryScreenState extends State<LibraryScreen>
                                 child: ClipRRect(
                                   borderRadius: BorderRadius.circular(8),
                                   child: playlist.coverImage != null && playlist.coverImage!.isNotEmpty
-                                      ? Image.file(
-                                          File(playlist.coverImage!),
-                                          fit: BoxFit.cover,
-                                          errorBuilder: (context, error, stackTrace) => Icon(
-                                            Icons.queue_music,
-                                            color: Theme.of(context).colorScheme.primary,
-                                            size: 30,
-                                          ),
-                                        )
+                                      ? (kIsWeb || playlist.coverImage!.startsWith('http')
+                                          ? Image.network(
+                                              playlist.coverImage!,
+                                              fit: BoxFit.cover,
+                                              errorBuilder: (context, error, stackTrace) => Icon(
+                                                Icons.queue_music,
+                                                color: Theme.of(context).colorScheme.primary,
+                                                size: 30,
+                                              ),
+                                            )
+                                          : Image.file(
+                                              File(playlist.coverImage!),
+                                              fit: BoxFit.cover,
+                                              errorBuilder: (context, error, stackTrace) => Icon(
+                                                Icons.queue_music,
+                                                color: Theme.of(context).colorScheme.primary,
+                                                size: 30,
+                                              ),
+                                            ))
                                       : Icon(
                                           Icons.queue_music,
                                           color: Theme.of(context).colorScheme.primary,
@@ -435,7 +446,7 @@ class _LibraryScreenState extends State<LibraryScreen>
               child: coverUrl != null && coverUrl.isNotEmpty
                   ? ClipRRect(
                       borderRadius: BorderRadius.circular(8),
-                      child: isMine
+                      child: isMine && !kIsWeb
                           ? Image.file(
                               File(coverUrl),
                               fit: BoxFit.cover,

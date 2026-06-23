@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
@@ -32,18 +31,25 @@ class SessionService {
 
   String getDeviceName() {
     if (kIsWeb) return 'Web Browser';
-    if (Platform.isIOS) {
-      return 'Safari на iPhone';
-    } else if (Platform.isAndroid) {
-      return 'Chrome на Android';
-    } else if (Platform.isMacOS) {
-      return 'Chrome на macOS';
-    } else if (Platform.isWindows) {
-      return 'Firefox на Windows';
-    } else if (Platform.isLinux) {
-      return 'Firefox на Linux';
+    try {
+      // Use defaultTargetPlatform which is safe on all platforms
+      switch (defaultTargetPlatform) {
+        case TargetPlatform.iOS:
+          return 'Safari на iPhone';
+        case TargetPlatform.android:
+          return 'Chrome на Android';
+        case TargetPlatform.macOS:
+          return 'Chrome на macOS';
+        case TargetPlatform.windows:
+          return 'Firefox на Windows';
+        case TargetPlatform.linux:
+          return 'Firefox на Linux';
+        case TargetPlatform.fuchsia:
+          return 'Unknown Device';
+      }
+    } catch (_) {
+      return 'Unknown Device';
     }
-    return 'Unknown Device';
   }
 
   Future<void> registerNewSession(String email) async {

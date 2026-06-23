@@ -1,4 +1,3 @@
-import 'dart:io';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/user_model.dart';
 
@@ -285,8 +284,8 @@ class SupabaseAuthService {
     required String username,
     String? bio,
     List<Map<String, dynamic>>? socialLinks,
-    File? profileImageFile,
-    File? bannerImageFile,
+    dynamic profileImageFile,
+    dynamic bannerImageFile,
   }) async {
     final session = _client.auth.currentSession;
     if (session == null) {
@@ -337,7 +336,7 @@ class SupabaseAuthService {
   }
 
   /// Upload image to Storage (for profile and banner images)
-  Future<String> _uploadImage(File imageFile, String userId, String folder) async {
+  Future<String> _uploadImage(dynamic imageFile, String userId, String folder) async {
     try {
       final fileExt = imageFile.path.split('.').last;
       final fileName = '$userId/$folder/${DateTime.now().millisecondsSinceEpoch}.$fileExt';

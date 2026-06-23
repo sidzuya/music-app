@@ -1,4 +1,5 @@
-import 'dart:io';
+import 'dart:io' if (dart.library.html) 'dart:io';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/theme/app_theme.dart';
@@ -189,17 +190,7 @@ class _PlaylistSelectorDialogState extends State<PlaylistSelectorDialog> {
                         child: coverUrl != null && coverUrl.isNotEmpty
                             ? ClipRRect(
                                 borderRadius: BorderRadius.circular(8),
-                                child: Image.file(
-                                  File(coverUrl),
-                                  fit: BoxFit.cover,
-                                  errorBuilder: (context, error, stackTrace) {
-                                    return Icon(
-                                      isCollab ? Icons.people : Icons.queue_music,
-                                      color: Theme.of(context).colorScheme.primary,
-                                      size: 28,
-                                    );
-                                  },
-                                ),
+                                child: _buildCoverImage(coverUrl, isCollab, context),
                               )
                             : Icon(
                                 isCollab ? Icons.people : Icons.queue_music,
@@ -399,5 +390,27 @@ class _PlaylistSelectorDialogState extends State<PlaylistSelectorDialog> {
         ),
       );
     }
+  }
+
+  Widget _buildCoverImage(String coverUrl, bool isCollab, BuildContext context) {
+    final fallbackIcon = Icon(
+      isCollab ? Icons.people : Icons.queue_music,
+      color: Theme.of(context).colorScheme.primary,
+      size: 28,
+    );
+
+    if (kIsWeb || coverUrl.startsWith('http')) {
+      return Image.network(
+        coverUrl,
+        fit: BoxFit.cover,
+        errorBuilder: (context, error, stackTrace) => fallbackIcon,
+      );
+    }
+
+    return Image.file(
+      File(coverUrl),
+      fit: BoxFit.cover,
+      errorBuilder: (context, error, stackTrace) => fallbackIcon,
+    );
   }
 }

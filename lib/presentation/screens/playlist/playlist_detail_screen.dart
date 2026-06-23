@@ -1,4 +1,5 @@
-import 'dart:io';
+import 'dart:io' if (dart.library.html) 'dart:io';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
@@ -258,13 +259,21 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
                                           ClipRRect(
                                             borderRadius: BorderRadius.circular(12),
                                             child: _localCoverPath != null && _localCoverPath!.isNotEmpty
-                                                ? Image.file(
-                                                    File(_localCoverPath!),
-                                                    width: 160,
-                                                    height: 160,
-                                                    fit: BoxFit.cover,
-                                                    errorBuilder: (_, __, ___) => _defaultCoverWidget(),
-                                                  )
+                                                ? (kIsWeb
+                                                    ? Image.network(
+                                                        _localCoverPath!,
+                                                        width: 160,
+                                                        height: 160,
+                                                        fit: BoxFit.cover,
+                                                        errorBuilder: (_, __, ___) => _defaultCoverWidget(),
+                                                      )
+                                                    : Image.file(
+                                                        File(_localCoverPath!),
+                                                        width: 160,
+                                                        height: 160,
+                                                        fit: BoxFit.cover,
+                                                        errorBuilder: (_, __, ___) => _defaultCoverWidget(),
+                                                      ))
                                                 : _defaultCoverWidget(),
                                           ),
                                           // Camera overlay

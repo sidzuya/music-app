@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'dart:io';
 import 'dart:math' as math;
 
 import 'package:http/http.dart' as http;
@@ -256,13 +255,15 @@ Rules:
           },
         }),
       );
-    } on SocketException {
+    } on http.ClientException catch (error) {
+      throw _GeminiRequestFailure(apiMessage: error.message, isRetriable: true);
+    } catch (e) {
+      // Covers SocketException on native and network errors on web
+      if (e is _GeminiRequestFailure) rethrow;
       throw const _GeminiRequestFailure(
         apiMessage: 'Нет подключения к интернету.',
         isRetriable: true,
       );
-    } on http.ClientException catch (error) {
-      throw _GeminiRequestFailure(apiMessage: error.message, isRetriable: true);
     }
 
     if (response.statusCode < 200 || response.statusCode >= 300) {
