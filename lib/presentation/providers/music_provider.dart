@@ -542,5 +542,28 @@ class MusicProvider with ChangeNotifier, WidgetsBindingObserver {
     }
   }
 
+  /// Reorder a song in the queue from [oldIndex] to [newIndex].
+  /// Indices are relative to the upcoming songs list (starting after currentIndex).
+  void reorderQueue(int oldIndex, int newIndex) {
+    // Convert relative indices to absolute playlist indices
+    final absoluteOldIndex = _currentIndex + 1 + oldIndex;
+    final absoluteNewIndex = _currentIndex + 1 + (newIndex > oldIndex ? newIndex - 1 : newIndex);
+
+    if (absoluteOldIndex < 0 || absoluteOldIndex >= _playlist.length) return;
+    if (absoluteNewIndex < 0 || absoluteNewIndex >= _playlist.length) return;
+
+    final song = _playlist.removeAt(absoluteOldIndex);
+    _playlist.insert(absoluteNewIndex, song);
+    notifyListeners();
+  }
+
+  /// Remove a song from the queue at [relativeIndex] (relative to upcoming songs).
+  void removeFromQueue(int relativeIndex) {
+    final absoluteIndex = _currentIndex + 1 + relativeIndex;
+    if (absoluteIndex < 0 || absoluteIndex >= _playlist.length) return;
+    _playlist.removeAt(absoluteIndex);
+    notifyListeners();
+  }
+
 }
 enum RepeatMode { off, once, infinite }
