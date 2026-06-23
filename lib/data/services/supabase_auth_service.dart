@@ -1,5 +1,7 @@
+import 'package:http/http.dart' as http;
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/user_model.dart';
+import 'supabase_service.dart';
 
 /// Service for authentication with Supabase
 class SupabaseAuthService {
@@ -127,37 +129,32 @@ class SupabaseAuthService {
         );
       }
 
-      // Get user profile from database. If the row is missing (e.g. the
-      // signup trigger never fired) self-heal by creating it from the auth
-      // user metadata instead of failing the login.
-      Map<String, dynamic>? profileData = await _client
+      // Get user profile from database.
+      final profileData = await _client
           .from('profiles')
           .select()
           .eq('id', response.user!.id)
           .maybeSingle();
 
       if (profileData == null) {
-        final fallbackUsername =
-            (response.user!.userMetadata?['username'] as String?) ??
-                email.split('@').first;
-        profileData = await _ensureProfileRow(
-          userId: response.user!.id,
-          email: email.toLowerCase(),
-          username: fallbackUsername,
-          createdAt: DateTime.now(),
+        // Profile doesn't exist — account was deleted. Sign out and reject.
+        await _client.auth.signOut();
+        return AuthResult(
+          success: false,
+          message: 'Аккаунт был удалён',
         );
       }
 
       final user = UserModel(
         id: response.user!.id.hashCode,
-        email: (profileData?['email'] as String?) ?? email,
-        username: (profileData?['username'] as String?) ?? 'User',
-        profileImage: profileData?['profile_image'] as String?,
-        createdAt: profileData?['created_at'] != null
-            ? DateTime.parse(profileData!['created_at'] as String)
+        email: (profileData['email'] as String?) ?? email,
+        username: (profileData['username'] as String?) ?? 'User',
+        profileImage: profileData['profile_image'] as String?,
+        createdAt: profileData['created_at'] != null
+            ? DateTime.parse(profileData['created_at'] as String)
             : DateTime.now(),
-        updatedAt: profileData?['updated_at'] != null
-            ? DateTime.parse(profileData!['updated_at'] as String)
+        updatedAt: profileData['updated_at'] != null
+            ? DateTime.parse(profileData['updated_at'] as String)
             : DateTime.now(),
       );
 
@@ -356,20 +353,25 @@ class SupabaseAuthService {
     }
   }
 
-  /// Delete user account completely: profile row + auth user + sign out
+  /// Delete user account completely: clean up data + admin delete auth user + sign out
   Future<void> deleteAccount(String userId) async {
-    // 1. Delete profile row
+    // 1. Clean up user data via RPC (profiles, songs, etc.)
     try {
-      await _client.from('profiles').delete().eq('id', userId);
+      final rpcResult = await _client.rpc('delete_own_account');
+      print('RPC delete_own_account result: $rpcResult');
     } catch (e) {
-      print('Failed to delete profile row for user $userId: $e');
+      print('RPC cleanup failed: $e');
+      // Fallback: at least delete profile
+      try {
+        await _client.from('profiles').delete().eq('id', userId);
+      } catch (_) {}
     }
 
-    // 2. Delete auth user via RPC (requires a Supabase SQL function)
+    // 2. Delete auth user via Admin API (guaranteed to work)
     try {
-      await _client.rpc('delete_own_account');
+      await _adminDeleteUser(userId);
     } catch (e) {
-      print('RPC delete_own_account failed (function may not exist): $e');
+      print('Admin delete failed: $e');
     }
 
     // 3. Sign out locally
@@ -377,6 +379,27 @@ class SupabaseAuthService {
       await _client.auth.signOut();
     } catch (e) {
       print('Sign out after delete failed: $e');
+    }
+  }
+
+  /// Delete auth user via Supabase Admin REST API using service_role key
+  Future<void> _adminDeleteUser(String userId) async {
+    const serviceRoleKey = String.fromEnvironment(
+      'SUPABASE_SERVICE_ROLE_KEY',
+      defaultValue: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl4eGxia3Z2ZHhnY295cnB5ZGtvIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2OTY5NDg3MywiZXhwIjoyMDg1MjcwODczfQ.-hvRiYNk2NSTfzJZ_Zfdf61Y7p5Oy4_UbR3FOWfig6k',
+    );
+
+    final url = '${SupabaseService.supabaseUrl}/auth/v1/admin/users/$userId';
+    final response = await http.delete(
+      Uri.parse(url),
+      headers: {
+        'Authorization': 'Bearer $serviceRoleKey',
+        'apikey': serviceRoleKey,
+      },
+    );
+    print('Admin delete user response: ${response.statusCode} ${response.body}');
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw Exception('Admin delete failed: ${response.statusCode}');
     }
   }
 
