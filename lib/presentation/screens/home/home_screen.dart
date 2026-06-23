@@ -612,12 +612,12 @@ class _HomeScreenState extends State<HomeScreen> {
                   builder: (context, isHovered) {
                     return IconButton(
                       icon: Icon(
-                        Icons.playlist_play,
+                        Icons.queue_music,
                         color: isHovered ? Colors.white : AppTheme.textSecondary,
                         size: 22,
                       ),
                       onPressed: () {
-                        setState(() => _currentIndex = 3);
+                        _showDesktopQueueSheet(context, musicProvider);
                       },
                     );
                   },
@@ -1505,11 +1505,261 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  void _showDesktopQueueSheet(BuildContext context, MusicProvider musicProvider) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: AppTheme.cardBackground,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (context) {
+        return DraggableScrollableSheet(
+          initialChildSize: 0.6,
+          minChildSize: 0.3,
+          maxChildSize: 0.85,
+          expand: false,
+          builder: (context, scrollController) {
+            return _DesktopQueueContent(
+              musicProvider: musicProvider,
+              scrollController: scrollController,
+            );
+          },
+        );
+      },
+    );
+  }
+
   String _getGreeting() {
     final hour = DateTime.now().hour;
     if (hour < 12) return 'good_morning';
     if (hour < 17) return 'good_afternoon';
     return 'good_evening';
+  }
+}
+
+/// Desktop queue bottom sheet with drag-and-drop
+class _DesktopQueueContent extends StatelessWidget {
+  final MusicProvider musicProvider;
+  final ScrollController scrollController;
+
+  const _DesktopQueueContent({
+    required this.musicProvider,
+    required this.scrollController,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return ListenableBuilder(
+      listenable: musicProvider,
+      builder: (context, _) {
+        final playlist = musicProvider.playlist;
+        final currentSong = musicProvider.currentSong;
+        final currentIndex = musicProvider.currentIndex;
+
+        final upcomingSongs = playlist.isNotEmpty && currentIndex < playlist.length
+            ? playlist.sublist(currentIndex + 1)
+            : <SongModel>[];
+
+        return Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Drag handle
+              Center(
+                child: Container(
+                  margin: const EdgeInsets.only(top: 12, bottom: 16),
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: AppTheme.textTertiary,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const Text(
+                'Очередь воспроизведения',
+                style: TextStyle(
+                  color: AppTheme.textPrimary,
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 20),
+              // Now Playing
+              const Text(
+                'Сейчас играет',
+                style: TextStyle(
+                  color: AppTheme.textSecondary,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 8),
+              if (currentSong != null)
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: AppTheme.primaryGreen.withOpacity(0.08),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: AppTheme.primaryGreen.withOpacity(0.3)),
+                  ),
+                  child: Row(
+                    children: [
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(6),
+                        child: currentSong.albumArt != null
+                            ? Image.network(
+                                currentSong.albumArt!,
+                                width: 48, height: 48, fit: BoxFit.cover,
+                                errorBuilder: (_, __, ___) => _cover(48),
+                              )
+                            : _cover(48),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(currentSong.title,
+                                style: const TextStyle(color: AppTheme.textPrimary, fontWeight: FontWeight.bold, fontSize: 15),
+                                maxLines: 1, overflow: TextOverflow.ellipsis),
+                            const SizedBox(height: 2),
+                            Text(currentSong.artist,
+                                style: const TextStyle(color: AppTheme.textSecondary, fontSize: 13),
+                                maxLines: 1, overflow: TextOverflow.ellipsis),
+                          ],
+                        ),
+                      ),
+                      const Icon(Icons.volume_up, color: AppTheme.primaryGreen, size: 20),
+                    ],
+                  ),
+                ),
+              const SizedBox(height: 20),
+              // Upcoming header
+              Row(
+                children: [
+                  const Text('Далее',
+                      style: TextStyle(color: AppTheme.textSecondary, fontSize: 13, fontWeight: FontWeight.w600)),
+                  const Spacer(),
+                  if (upcomingSongs.isNotEmpty)
+                    Text('${upcomingSongs.length} треков',
+                        style: const TextStyle(color: AppTheme.textTertiary, fontSize: 12)),
+                ],
+              ),
+              const SizedBox(height: 8),
+              if (upcomingSongs.isEmpty)
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 24),
+                  child: Center(
+                    child: Text('Очередь пуста',
+                        style: TextStyle(color: AppTheme.textTertiary, fontStyle: FontStyle.italic)),
+                  ),
+                )
+              else
+                Expanded(
+                  child: ReorderableListView.builder(
+                    scrollController: scrollController,
+                    itemCount: upcomingSongs.length,
+                    proxyDecorator: (child, index, animation) {
+                      return AnimatedBuilder(
+                        animation: animation,
+                        builder: (context, child) {
+                          final elevation = Tween<double>(begin: 0, end: 8).animate(animation).value;
+                          return Material(
+                            elevation: elevation,
+                            color: AppTheme.cardBackground,
+                            borderRadius: BorderRadius.circular(8),
+                            child: child,
+                          );
+                        },
+                        child: child,
+                      );
+                    },
+                    onReorder: (oldIndex, newIndex) {
+                      musicProvider.reorderQueue(oldIndex, newIndex);
+                    },
+                    itemBuilder: (context, index) {
+                      final song = upcomingSongs[index];
+                      final originalIndex = currentIndex + 1 + index;
+                      return Dismissible(
+                        key: ValueKey('dq_${originalIndex}_${song.title}'),
+                        direction: DismissDirection.endToStart,
+                        background: Container(
+                          alignment: Alignment.centerRight,
+                          padding: const EdgeInsets.only(right: 20),
+                          decoration: BoxDecoration(
+                            color: Colors.red.withOpacity(0.2),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: const Icon(Icons.delete_outline, color: Colors.red),
+                        ),
+                        onDismissed: (_) => musicProvider.removeFromQueue(index),
+                        child: Material(
+                          key: ValueKey('dq_${originalIndex}_${song.title}'),
+                          color: Colors.transparent,
+                          child: InkWell(
+                            borderRadius: BorderRadius.circular(8),
+                            onTap: () {
+                              Navigator.pop(context);
+                              musicProvider.playPlaylist(playlist, originalIndex);
+                            },
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 8),
+                              child: Row(
+                                children: [
+                                  ReorderableDragStartListener(
+                                    index: index,
+                                    child: const Padding(
+                                      padding: EdgeInsets.only(right: 8),
+                                      child: Icon(Icons.drag_handle, color: AppTheme.textTertiary, size: 20),
+                                    ),
+                                  ),
+                                  ClipRRect(
+                                    borderRadius: BorderRadius.circular(4),
+                                    child: song.albumArt != null
+                                        ? Image.network(song.albumArt!, width: 44, height: 44, fit: BoxFit.cover,
+                                            errorBuilder: (_, __, ___) => _cover(44))
+                                        : _cover(44),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(song.title,
+                                            style: const TextStyle(color: AppTheme.textPrimary, fontSize: 14),
+                                            maxLines: 1, overflow: TextOverflow.ellipsis),
+                                        const SizedBox(height: 2),
+                                        Text(song.artist,
+                                            style: const TextStyle(color: AppTheme.textSecondary, fontSize: 12),
+                                            maxLines: 1, overflow: TextOverflow.ellipsis),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _cover(double size) {
+    return Container(
+      width: size, height: size,
+      decoration: BoxDecoration(color: AppTheme.surfaceColor, borderRadius: BorderRadius.circular(4)),
+      child: Icon(Icons.music_note, color: AppTheme.textTertiary, size: size * 0.5),
+    );
   }
 }
 
