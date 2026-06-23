@@ -388,6 +388,15 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
   }
 
   void _showTwoFactorSettings(LocaleProvider localeProvider) {
+    // State variables declared OUTSIDE builder to survive rebuilds on web
+    String statusStep = _twoFactorEnabled ? 'toggle_off' : 'toggle_on';
+    final emailFieldController = TextEditingController(text: _twoFactorEmail.isNotEmpty ? _twoFactorEmail : _emailController.text);
+    final codeFieldController = TextEditingController();
+    String generatedCode = '';
+    bool sendingEmail = false;
+    String errorMessage = '';
+    List<String> backupCodes = [];
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -396,14 +405,6 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
       builder: (context) {
-        String statusStep = _twoFactorEnabled ? 'toggle_off' : 'toggle_on';
-        final emailFieldController = TextEditingController(text: _twoFactorEmail.isNotEmpty ? _twoFactorEmail : _emailController.text);
-        final codeFieldController = TextEditingController();
-        String generatedCode = '';
-        bool sendingEmail = false;
-        String errorMessage = '';
-        List<String> backupCodes = [];
-
         return StatefulBuilder(
           builder: (context, setModalState) {
             return AnimatedContainer(
