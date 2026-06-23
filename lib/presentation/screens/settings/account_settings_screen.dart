@@ -8,6 +8,7 @@ import '../../../core/theme/app_theme.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/locale_provider.dart';
 import '../../../data/services/session_service.dart';
+import '../auth/login_screen.dart';
 
 
 class AccountSettingsScreen extends StatefulWidget {
@@ -964,20 +965,18 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
           ),
           TextButton(
             onPressed: () async {
-              // Grab provider before popping
+              // Grab references before any navigation
               final authProvider = Provider.of<AuthProvider>(context, listen: false);
-              final messenger = ScaffoldMessenger.of(context);
+              final navigator = Navigator.of(context);
               
-              Navigator.pop(context); // Close dialog
+              navigator.pop(); // Close dialog
               
-              // Delete account first, then navigate
               await authProvider.deleteAccount();
               
-              messenger.showSnackBar(
-                const SnackBar(
-                  content: Text('Аккаунт успешно удален'),
-                  backgroundColor: AppTheme.primaryGreen,
-                ),
+              // Navigate to login screen, clearing entire nav stack
+              navigator.pushAndRemoveUntil(
+                MaterialPageRoute(builder: (_) => const LoginScreen()),
+                (route) => false,
               );
             },
             child: Text(localeProvider.getString('delete'), style: const TextStyle(color: AppTheme.errorColor)),

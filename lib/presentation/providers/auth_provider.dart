@@ -210,7 +210,12 @@ class AuthProvider with ChangeNotifier {
         debugPrint('Error deleting account: $e');
       }
     }
-    await logout();
+
+    // Force clear state even if signOut already happened in deleteAccount
+    _currentUser = null;
+    _isLoggedIn = false;
+    NotificationService().cleanup();
+    notifyListeners();
   }
 }
 
