@@ -305,18 +305,7 @@ class SongOptionsBottomSheet extends StatelessWidget {
                               if (kIsWeb) {
                                 showShareDialog(context, song, shareUrl);
                               } else {
-                                // Always copy to clipboard first
                                 Clipboard.setData(ClipboardData(text: shareUrl));
-                                
-                                if (context.mounted) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      content: const Text('Ссылка на трек скопирована в буфер обмена'),
-                                      backgroundColor: Theme.of(context).colorScheme.primary,
-                                      duration: const Duration(seconds: 2),
-                                    ),
-                                  );
-                                }
                                 
                                 try {
                                   final box = context.findRenderObject() as RenderBox?;
